@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  role          UserRole
+  firstName     String
+  lastName      String
+  firstNameNe   String?
+  lastNameNe    String?
+  phone         String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  teacher       Teacher?
+  student       Student?
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Teacher {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employeeId    String   @unique
+  department    String?
+
+  classSubjects  ClassSubject[]
+  classTeacherOf Class[]       @relation("ClassTeacher")
+  attendances    Attendance[]
+  assignments    Assignment[]
+  grades         Grade[]
+}
+
+model Student {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rollNumber    String
+  classId       String
+  class         Class    @relation(fields: [classId], references: [id])
+
+  attendances   Attendance[]
+  submissions   Submission[]
+  grades        Grade[]
+
+  @@unique([rollNumber, classId])
+}
+
+model AcademicYear {
+  id        String   @id @default(cuid())
+  name      String
+  nameNe    String?
+  startDate DateTime
+  endDate   DateTime
+  isCurrent Boolean  @default(false)
+
+  classes     Class[]
+  assignments Assignment[]
+}
+
+model Class {
+  id              String       @id @default(cuid())
+  grade           Int
+  section         String
+  academicYearId  String
+  academicYear    AcademicYear @relation(fields: [academicYearId], references: [id])
+  classTeacherId  String?
+  classTeacher    Teacher?     @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+
+  students      Student[]
+  classSubjects ClassSubject[]
+  attendances   Attendance[]
+  assignments   Assignment[]
+
+  @@unique([grade, section, academicYearId])
+}
+
+model Subject {
+  id       String  @id @default(cuid())
+  code     String  @unique
+  name     String
+  nameNe   String?
+  isActive Boolean @default(true)
+
+  classSubjects ClassSubject[]
+  assignments   Assignment[]
+  grades        Grade[]
+}
+
+model ClassSubject {
+  id        String   @id @default(cuid())
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+  teacherId String?
+  teacher   Teacher? @relation(fields: [teacherId], references: [id])
+
+  @@unique([classId, subjectId])
+}
+
+model Attendance {
+  id         String   @id @default(cuid())
+  studentId  String
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId    String
+  class      Class    @relation(fields: [classId], references: [id])
+  date       DateTime @db.Date
+  status     String   // present, absent, late, excused
+  markedById String
+  markedBy   Teacher  @relation(fields: [markedById], references: [id])
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@unique([studentId, date])
+  @@index([classId, date])
+}
+
+model Assignment {
+  id             String       @id @default(cuid())
+  title          String
+  titleNe        String?
+  description    String?
+  subjectId      String
+  subject        Subject      @relation(fields: [subjectId], references: [id])
+  classId        String
+  class          Class        @relation(fields: [classId], references: [id])
+  teacherId      String
+  teacher        Teacher      @relation(fields: [teacherId], references: [id])
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  dueDate        DateTime
+  maxScore       Int          @default(100)
+  type           String       @default("homework")
+  createdAt      DateTime     @default(now())
+
+  submissions Submission[]
+
+  @@index([classId, dueDate])
+}
+
+model Submission {
+  id           String     @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  submittedAt  DateTime   @default(now())
+  status       String     @default("submitted")
+  content      String?
+  fileUrl      String?
+  score        Int?
+  feedback     String?
+  gradedAt     DateTime?
+
+  @@unique([assignmentId, studentId])
+}
+
+model Grade {
+  id             String  @id @default(cuid())
+  studentId      String
+  student        Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId      String
+  subject        Subject @relation(fields: [subjectId], references: [id])
+  teacherId      String
+  teacher        Teacher @relation(fields: [teacherId], references: [id])
+  assessmentType String
+  term           String
+  score          Float
+  maxScore       Float
+  percentage     Float
+  letterGrade    String
+  remarks        String?
+  createdAt      DateTime @default(now())
+
+  @@index([studentId, subjectId])
+}
+
+model GradingScale {
+  id        String              @id @default(cuid())
+  name      String
+  isDefault Boolean             @default(false)
+  entries   GradingScaleEntry[]
+}
+
+model GradingScaleEntry {
+  id             String       @id @default(cuid())
+  gradingScaleId String
+  gradingScale   GradingScale @relation(fields: [gradingScaleId], references: [id], onDelete: Cascade)
+  grade          String
+  minPercentage  Float
+  maxPercentage  Float
+  gpa            Float
+}
