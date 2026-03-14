@@ -4,7 +4,7 @@ Minimum viable product for the EduNexus school management system.
 
 ## Deployment
 
-- **Backend:** Railway (`talented-wisdom` / production)
+- **Backend:** Previously on Railway (decommissioned)
 - **Database:** Supabase (configured)
 
 ## Tech Stack
